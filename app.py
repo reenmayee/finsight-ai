@@ -13,7 +13,6 @@ import os
 load_dotenv()  # Loads variables from .env
 api_key = os.getenv("api_key")
 
-
 # Load trained model
 model = joblib.load('xgb_model.pkl')
 
