@@ -6,3 +6,4 @@ vaderSentiment
 matplotlib
 shap
 requests
+python-dotenv
