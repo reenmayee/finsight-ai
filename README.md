@@ -3,10 +3,7 @@
 A machine learning-powered web app that predicts whether to **Buy**, **Sell**, or **Hold** a stock using technical indicators and real-time news sentiment analysis.
 
 ## 🚀 Live App
-
-[View Deployment](https://your-deployment-link)  
-_Replace this link with your actual Streamlit Cloud or HuggingFace Space URL._
-
+(https://finsight-ai-13.streamlit.app/)
 ---
 
 ## 🔍 Features
