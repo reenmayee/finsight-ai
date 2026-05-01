@@ -6,7 +6,7 @@ import os
 
 # Load environment variables
 load_dotenv()
-api_key = os.getenv("NEWS_API_KEY")
+api_key = os.getenv("api_key")
 
 # Sentiment analyzer setup
 analyzer = SentimentIntensityAnalyzer()
