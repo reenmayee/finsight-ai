@@ -10,7 +10,7 @@ from sentiments import get_sentiment_score
 from dotenv import load_dotenv # type: ignore
 import os
 
-load_dotenv()  # Loads variables from .env
+load_dotenv()
 api_key = os.getenv("api_key")
 
 # Load trained model
@@ -23,6 +23,12 @@ st.markdown("Predict **Buy / Sell / Hold** using technical indicators + news sen
 
 ticker = st.text_input("Enter stock ticker (e.g., AAPL, TCS.BO, INFY.BO)", "AAPL")
 st.write(f"Selected Ticker: `{ticker}`")
+
+def safe_float(x):
+    try:
+        return float(x)
+    except:
+        return None
 
 if st.button("Predict"):
     end = datetime.date.today()
@@ -38,18 +44,26 @@ if st.button("Predict"):
             df['macd'] = compute_macd(df)
             df['sma'] = compute_sma(df)
             df['sentiment'] = get_sentiment_score(ticker)
-            df_clean = df.dropna()
+
+            df_clean = df[['rsi', 'macd', 'sma', 'sentiment']].dropna()
 
             if df_clean.empty:
                 st.warning("Not enough data to compute indicators.")
             else:
                 latest = df_clean.iloc[-1]
-                input_features = pd.DataFrame([[
-                    latest['rsi'],
-                    latest['macd'],
-                    latest['sma'],
-                    latest['sentiment']
-                ]], columns=['rsi', 'macd', 'sma', 'sentiment']).astype(float)
+
+                input_features = pd.DataFrame([[ 
+                    safe_float(latest['rsi']),
+                    safe_float(latest['macd']),
+                    safe_float(latest['sma']),
+                    safe_float(latest['sentiment'])
+                ]], columns=['rsi', 'macd', 'sma', 'sentiment'])
+
+                input_features = input_features.apply(pd.to_numeric, errors='coerce')
+
+                if input_features.isnull().values.any():
+                    st.warning("⚠️ Some values were invalid. Using fallback values.")
+                    input_features = input_features.fillna(0)
 
                 prediction = model.predict(input_features)[0]
                 proba = model.predict_proba(input_features)[0]
@@ -61,7 +75,6 @@ if st.button("Predict"):
                 st.dataframe(input_features)
                 st.write("**Prediction Probabilities (Buy, Sell, Hold)**", proba)
 
-                # SHAP explainability
                 st.subheader("🔍 Model Explainability (SHAP)")
                 explainer = shap.Explainer(model)
                 shap_values = explainer(input_features)
