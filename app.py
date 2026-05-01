@@ -58,7 +58,9 @@ if st.button("Predict"):
                     safe_float(latest['sma']),
                     safe_float(latest['sentiment'])
                 ]], columns=['rsi', 'macd', 'sma', 'sentiment'])
-
+                
+                st.write("RAW VALUES:", latest['rsi'], latest['macd'], latest['sma'], latest['sentiment'])
+                
                 input_features = input_features.apply(pd.to_numeric, errors='coerce')
 
                 if input_features.isnull().values.any():
