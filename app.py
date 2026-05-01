@@ -1,20 +1,19 @@
-import streamlit as st  # type: ignore
-import yfinance as yf  # type: ignore
-import pandas as pd  # type: ignore
-import joblib  # type: ignore
+import streamlit as st  
+import yfinance as yf 
+import pandas as pd  
+import joblib  
 import datetime
-import shap  # type: ignore
-import matplotlib.pyplot as plt  # type: ignore
+import shap 
+import matplotlib.pyplot as plt  
 from indicators import compute_rsi, compute_macd, compute_sma
 from sentiments import get_sentiment_score
-from dotenv import load_dotenv  # type: ignore
+from dotenv import load_dotenv  
 import os
 import numpy as np
 
 load_dotenv()
 api_key = os.getenv("api_key")
 
-# Load trained model
 model = joblib.load('xgb_model.pkl')
 
 # UI
@@ -25,8 +24,6 @@ st.markdown("Predict **Buy / Sell / Hold** using technical indicators + news sen
 ticker = st.text_input("Enter stock ticker (e.g., AAPL, TCS.BO, INFY.BO)", "AAPL")
 st.write(f"Selected Ticker: `{ticker}`")
 
-
-# ✅ Safe float conversion
 def safe_float(x):
     try:
         return float(x)
@@ -45,12 +42,10 @@ if st.button("Predict"):
     else:
         with st.spinner("Analyzing stock data..."):
 
-            # Compute indicators
             df['rsi'] = compute_rsi(df)
             df['macd'] = compute_macd(df)
             df['sma'] = compute_sma(df)
 
-            # ✅ Safe sentiment handling
             sent = get_sentiment_score(ticker)
             try:
                 sent = float(sent)
@@ -58,10 +53,8 @@ if st.button("Predict"):
                 sent = 0.0
             df['sentiment'] = sent
 
-            # ✅ Use latest row directly (no risky dropna)
             latest = df.iloc[-1]
 
-            # ✅ Build input safely
             input_features = pd.DataFrame([[ 
                 safe_float(latest['rsi']),
                 safe_float(latest['macd']),
@@ -69,10 +62,8 @@ if st.button("Predict"):
                 safe_float(latest['sentiment'])
             ]], columns=['rsi', 'macd', 'sma', 'sentiment'])
 
-            # Convert properly
             input_features = input_features.apply(pd.to_numeric, errors='coerce')
 
-            # ✅ Handle missing values smartly
             if input_features.isnull().values.any():
                 st.warning("⚠️ Some indicators missing. Using safe fallback values.")
                 input_features = input_features.fillna(input_features.mean()).fillna(0)
