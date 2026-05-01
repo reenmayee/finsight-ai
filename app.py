@@ -9,8 +9,9 @@ from indicators import compute_rsi, compute_macd, compute_sma
 from sentiments import get_sentiment_score
 from dotenv import load_dotenv  # type: ignore
 import os
+import numpy as np
 
-load_dotenv()  # Loads variables from .env
+load_dotenv()
 api_key = os.getenv("api_key")
 
 # Load trained model
@@ -24,6 +25,15 @@ st.markdown("Predict **Buy / Sell / Hold** using technical indicators + news sen
 ticker = st.text_input("Enter stock ticker (e.g., AAPL, TCS.BO, INFY.BO)", "AAPL")
 st.write(f"Selected Ticker: `{ticker}`")
 
+
+# ✅ Safe float conversion
+def safe_float(x):
+    try:
+        return float(x)
+    except:
+        return np.nan
+
+
 if st.button("Predict"):
     end = datetime.date.today()
     start = end - datetime.timedelta(days=100)
@@ -34,55 +44,69 @@ if st.button("Predict"):
         st.error("Couldn't fetch stock data. Check ticker symbol.")
     else:
         with st.spinner("Analyzing stock data..."):
+
+            # Compute indicators
             df['rsi'] = compute_rsi(df)
             df['macd'] = compute_macd(df)
             df['sma'] = compute_sma(df)
-            df['sentiment'] = get_sentiment_score(ticker)
 
-            df_clean = df.dropna()
+            # ✅ Safe sentiment handling
+            sent = get_sentiment_score(ticker)
+            try:
+                sent = float(sent)
+            except:
+                sent = 0.0
+            df['sentiment'] = sent
 
-            if df_clean.empty:
-                st.warning("Not enough data to compute indicators.")
-            else:
-                latest = df_clean.iloc[-1]
+            # ✅ Use latest row directly (no risky dropna)
+            latest = df.iloc[-1]
 
-                input_features = pd.DataFrame(
-                    [[
-                        latest['rsi'],
-                        latest['macd'],
-                        latest['sma'],
-                        latest['sentiment']
-                    ]],
-                    columns=['rsi', 'macd', 'sma', 'sentiment']
-                ).astype(float)
+            # ✅ Build input safely
+            input_features = pd.DataFrame([[ 
+                safe_float(latest['rsi']),
+                safe_float(latest['macd']),
+                safe_float(latest['sma']),
+                safe_float(latest['sentiment'])
+            ]], columns=['rsi', 'macd', 'sma', 'sentiment'])
 
-                prediction = model.predict(input_features)[0]
-                proba = model.predict_proba(input_features)[0]
-                label_map = {0: 'Buy 🟢', 1: 'Sell 🔴', 2: 'Hold ⚪'}
+            # Convert properly
+            input_features = input_features.apply(pd.to_numeric, errors='coerce')
 
-                st.subheader("📊 Prediction")
-                st.success(label_map.get(prediction, "Unknown"))
+            # ✅ Handle missing values smartly
+            if input_features.isnull().values.any():
+                st.warning("⚠️ Some indicators missing. Using safe fallback values.")
+                input_features = input_features.fillna(input_features.mean()).fillna(0)
 
-                st.write("**Input Features**")
-                st.dataframe(input_features)
+            # Prediction
+            prediction = model.predict(input_features)[0]
+            proba = model.predict_proba(input_features)[0]
+            label_map = {0: 'Buy 🟢', 1: 'Sell 🔴', 2: 'Hold ⚪'}
 
-                st.write("**Prediction Probabilities (Buy, Sell, Hold)**", proba)
+            st.subheader("📊 Prediction")
+            st.success(label_map.get(prediction, "Unknown"))
+            st.write("**Input Features**")
+            st.dataframe(input_features)
+            st.write("**Prediction Probabilities (Buy, Sell, Hold)**", proba)
 
-                # SHAP explainability
-                st.subheader("🔍 Model Explainability (SHAP)")
-                explainer = shap.Explainer(model)
-                shap_values = explainer(input_features)
+            # SHAP explainability
+            st.subheader("🔍 Model Explainability (SHAP)")
+            explainer = shap.Explainer(model)
+            shap_values = explainer(input_features)
 
-                shap_exp = shap.Explanation(
-                    values=shap_values.values[0][prediction],
-                    base_values=shap_values.base_values[0][prediction],
-                    data=input_features.values[0],
-                    feature_names=input_features.columns.tolist()
-                )
+            shap_exp = shap.Explanation(
+                values=shap_values.values[0][prediction],
+                base_values=shap_values.base_values[0][prediction],
+                data=input_features.values[0],
+                feature_names=input_features.columns.tolist()
+            )
 
-                fig, ax = plt.subplots()
-                shap.plots.waterfall(shap_exp, show=False)
-                st.pyplot(fig)
+            fig, ax = plt.subplots()
+            shap.plots.waterfall(shap_exp, show=False)
+            st.pyplot(fig)
 
-                st.line_chart(df['Close'])
-                st.dataframe(df_clean.tail())
+            # Charts
+            st.subheader("📉 Stock Price Trend")
+            st.line_chart(df['Close'])
+
+            st.subheader("📋 Recent Data")
+            st.dataframe(df.tail())
